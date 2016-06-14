@@ -1,4 +1,4 @@
-require "httpclient"
+require "faraday"
 require 'json'
 
 # :stopdoc:
@@ -22,22 +22,12 @@ module RallyAPI
       @low_debug = low_debug
       @logger = nil
 
-      @rally_http_client = HTTPClient.new
-      @rally_http_client.protocol_retry_count = 2
-      @rally_http_client.connect_timeout = 300
-      @rally_http_client.receive_timeout = 300
-      @rally_http_client.send_timeout    = 300
-      @rally_http_client.ssl_config.verify_mode = OpenSSL::SSL::VERIFY_NONE
-      @rally_http_client.transparent_gzip_decompression = true
-      #@rally_http_client.debug_dev = STDOUT
+      faraday_params = {request: { open_timeout: 300, timeout: 300}, ssl: {verify: false}}
 
-      #passed in proxy setup overrides env level proxy
-      env_proxy = ENV["http_proxy"]   #todo - this will go in the future
-      env_proxy = ENV["rally_proxy"] if env_proxy.nil?
-      if (!env_proxy.nil?) && (proxy_info.nil?)
-        @rally_http_client.proxy = env_proxy
-      end
-      @rally_http_client.proxy = proxy_info unless proxy_info.nil?
+      proxy = proxy_info || ENV["http_proxy"] || ENV["rally_proxy"]  #todo - this will go in the future
+
+      faraday_params[:proxy] = proxy unless proxy.nil?
+      @rally_http_client = Faraday.new(faraday_params)
 
       @find_threads = 4
     end
@@ -51,7 +41,7 @@ module RallyAPI
     end
 
     def set_ssl_verify_mode(mode = OpenSSL::SSL::VERIFY_NONE)
-      @rally_http_client.ssl_config.verify_mode = mode
+      log_info "WARN: No set_ssl_verify_mode() in faraday."
     end
 
     #[]todo - handle token expiration more gracefully  - eg handle renewing
@@ -72,12 +62,11 @@ module RallyAPI
 
     def logger=(log_dev)
       @logger = log_dev
-      @rally_http_client.debug_dev = log_dev
     end
 
     #may be needed for session issues
     def reset_cookies
-      @rally_http_client.cookie_manager.cookies = []
+      log_info "WARN: No reset in faraday."
     end
 
     #you can have any number you want as long as it is between 1 and 4
@@ -134,8 +123,8 @@ module RallyAPI
       end
 
       begin
-        log_info("Rally API calling #{method} - #{url} with #{req_args}\n With cookies: #{@rally_http_client.cookie_manager.cookies}")
-        response = @rally_http_client.request(method, url, req_args)
+        log_info("Rally API calling #{method} - #{url} with #{req_args}")
+        response = @rally_http_client.run_request(method, url, req_args[:header], req_args[:body])
       rescue Exception => ex
         msg =  "RallyAPI: - rescued exception - #{ex.message} on request to #{url} with params #{url_params}"
         log_info(msg)
@@ -143,8 +132,8 @@ module RallyAPI
       end
 
       log_info("RallyAPI response was - #{response.inspect}")
-      if response.status_code != 200
-        msg = "RallyAPI - HTTP-#{response.status_code} on request - #{url}."
+      if response.status != 200
+        msg = "RallyAPI - HTTP-#{response.status} on request - #{url}."
         msg << "\nResponse was: #{response.body}"
         raise StandardError, msg
       end
@@ -184,8 +173,9 @@ module RallyAPI
     end
 
     def set_client_user(base_url, user, password)
-      @rally_http_client.set_auth(base_url, user, password)
-      @rally_http_client.www_auth.basic_auth.challenge(base_url)  #force httpclient to put basic on first req to rally
+      log_info("WARN: No set_client_user")
+      # @rally_http_client.set_auth(base_url, user, password)
+      # @rally_http_client.www_auth.basic_auth.challenge(base_url)  #force httpclient to put basic on first req to rally
     end
 
     def set_api_key(auth_info)
