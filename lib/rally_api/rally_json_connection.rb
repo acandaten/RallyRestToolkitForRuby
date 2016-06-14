@@ -124,7 +124,7 @@ module RallyAPI
 
       begin
         log_info("Rally API calling #{method} - #{url} with #{req_args}")
-        response = @rally_http_client.run_request(method, url, req_args[:header], req_args[:body])
+        response = @rally_http_client.run_request(method, url, req_args, nil)
       rescue Exception => ex
         msg =  "RallyAPI: - rescued exception - #{ex.message} on request to #{url} with params #{url_params}"
         log_info(msg)
@@ -138,6 +138,8 @@ module RallyAPI
         raise StandardError, msg
       end
 
+      log_info response.body
+      
       json_obj = JSON.parse(response.body)   #todo handle null post error
       errs = check_for_errors(json_obj)
       raise StandardError, "\nError on request - #{url} - \n#{errs}" if errs[:errors].length > 0
@@ -173,7 +175,8 @@ module RallyAPI
     end
 
     def set_client_user(base_url, user, password)
-      log_info("WARN: No set_client_user")
+      # log_info("WARN: No set_client_user")
+      @rally_http_client.basic_auth(user, password)
       # @rally_http_client.set_auth(base_url, user, password)
       # @rally_http_client.www_auth.basic_auth.challenge(base_url)  #force httpclient to put basic on first req to rally
     end
